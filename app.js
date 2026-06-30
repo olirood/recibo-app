@@ -207,7 +207,7 @@ function renderLedger(){
           <span>${dayLabel(date)}</span>
           <span>$${fmtMoney(dayTotal)}</span>
         </div>
-        ${rows}
+        <div class="day-card">${rows}</div>
       </div>`;
   }).join('');
 
