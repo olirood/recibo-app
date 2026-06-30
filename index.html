@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0E0D0B">
+<title>Recibo — gastos</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Recibo">
+<style>
+@font-face {
+  font-family: 'SystemMono';
+  src: local('SF Mono'), local('Menlo'), local('Consolas');
+}
+
+:root{
+  --bg: #0E0D0B;
+  --bg-elevated: #17150F;
+  --bg-card: #1C1A14;
+  --ink: #F4EFE3;
+  --ink-dim: #A9A299;
+  --ink-faint: #6B655C;
+  --amber: #E8A33D;
+  --amber-dim: #6B5226;
+  --rule: #2A2720;
+  --rule-soft: #211F19;
+  --danger: #C75C4A;
+  --good: #7FA66B;
+
+  --font-display: 'Barlow Condensed', system-ui, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  --font-mono: 'SystemMono', 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+}
+
+*{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+html,body{
+  margin:0; padding:0; height:100%;
+  background:var(--bg); color:var(--ink);
+  font-family:var(--font-body);
+  overscroll-behavior:none;
+  -webkit-user-select:none; user-select:none;
+}
+input, textarea{ -webkit-user-select:text; user-select:text; }
+
+#app{
+  position:fixed; inset:0;
+  display:flex; flex-direction:column;
+  padding-top:var(--safe-top);
+  padding-bottom:var(--safe-bottom);
+  overflow:hidden;
+}
+
+/* ---------- TOP BAR ---------- */
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 20px 8px;
+  flex-shrink:0;
+}
+.list-switcher{
+  display:flex; align-items:center; gap:6px;
+  font-family:var(--font-display);
+  font-size:15px; font-weight:600; letter-spacing:.02em;
+  color:var(--ink-dim);
+  background:var(--bg-elevated);
+  border:1px solid var(--rule);
+  border-radius:100px;
+  padding:7px 14px 7px 12px;
+}
+.list-switcher .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);flex-shrink:0;}
+.list-switcher .chev{font-size:10px; color:var(--ink-faint); margin-left:2px;}
+.icon-btn{
+  width:34px; height:34px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--bg-elevated); border:1px solid var(--rule);
+  color:var(--ink-dim);
+}
+
+/* ---------- TOTAL HERO ---------- */
+.hero{ padding:18px 22px 6px; flex-shrink:0; }
+.hero-eyebrow{
+  font-family:var(--font-mono); font-size:11px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-faint);
+  display:flex; gap:8px; align-items:baseline;
+}
+.hero-eyebrow .period-pick{ color:var(--amber); border-bottom:1px dotted var(--amber-dim); padding-bottom:1px;}
+.hero-total{
+  font-family:var(--font-display); font-weight:700;
+  font-size:64px; line-height:.95; letter-spacing:-.01em;
+  margin-top:4px;
+  display:flex; align-items:flex-start; gap:4px;
+  font-variant-numeric: tabular-nums;
+}
+.hero-total .sign{ font-size:30px; color:var(--ink-faint); font-weight:500; margin-top:8px;}
+
+/* mini bars */
+.bars-row{
+  display:flex; gap:10px; padding:14px 22px 4px;
+  overflow-x:auto; flex-shrink:0;
+  scrollbar-width:none;
+}
+.bars-row::-webkit-scrollbar{display:none;}
+.bar-chip{
+  flex-shrink:0; min-width:64px;
+  background:var(--bg-elevated); border:1px solid var(--rule-soft);
+  border-radius:14px; padding:10px 12px 8px;
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+}
+.bar-chip .bar-track{ width:6px; height:46px; background:var(--rule-soft); border-radius:4px; position:relative; overflow:hidden;}
+.bar-chip .bar-fill{ position:absolute; bottom:0; left:0; right:0; background:var(--amber); border-radius:4px; }
+.bar-chip .emoji{ font-size:18px; }
+.bar-chip .amt{ font-family:var(--font-mono); font-size:11px; color:var(--ink-dim); }
+
+/* ---------- LEDGER / LIST ---------- */
+.ledger{
+  flex:1; overflow-y:auto; padding:10px 0 110px;
+  -webkit-overflow-scrolling:touch;
+}
+.day-group{ margin-bottom:4px; }
+.day-label{
+  font-family:var(--font-mono); font-size:11px; letter-spacing:.08em;
+  color:var(--ink-faint); padding:14px 22px 6px;
+  display:flex; justify-content:space-between;
+  position:sticky; top:0; background:linear-gradient(var(--bg) 70%, transparent);
+  backdrop-filter: blur(6px);
+}
+.tx-row{
+  display:flex; align-items:center; gap:13px;
+  padding:11px 22px;
+  border-bottom:1px solid var(--rule-soft);
+}
+.tx-emoji{
+  width:38px; height:38px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:18px; flex-shrink:0;
+  background:var(--bg-card);
+}
+.tx-mid{ flex:1; min-width:0; }
+.tx-desc{ font-size:15px; font-weight:500; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.tx-meta{ display:flex; gap:6px; margin-top:3px; flex-wrap:wrap;}
+.tx-tag{
+  font-family:var(--font-mono); font-size:10px; color:var(--ink-faint);
+  background:transparent; border:1px solid var(--rule); border-radius:5px;
+  padding:1px 6px;
+}
+.tx-amt{
+  font-family:var(--font-mono); font-size:15px; font-weight:600;
+  color:var(--ink); flex-shrink:0;
+  font-variant-numeric: tabular-nums;
+}
+.tx-amt.income{ color:var(--good); }
+.tx-recur-icon{ font-size:10px; color:var(--amber); margin-left:4px; }
+
+.empty-state{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:80px 40px 40px; text-align:center; gap:10px; color:var(--ink-faint);
+}
+.empty-state .glyph{ font-size:34px; opacity:.5; }
+.empty-state .title{ font-family:var(--font-display); font-size:20px; color:var(--ink-dim); font-weight:600;}
+.empty-state .sub{ font-size:13px; line-height:1.5; max-width:240px;}
+
+/* ---------- FAB ROW ---------- */
+.fab-row{
+  position:fixed; left:0; right:0; bottom:0;
+  padding:14px 20px calc(16px + var(--safe-bottom));
+  display:flex; align-items:center; justify-content:space-between;
+  background:linear-gradient(transparent, var(--bg) 35%);
+  pointer-events:none;
+}
+.fab-row > *{ pointer-events:auto; }
+.fab-left{ display:flex; gap:10px; }
+.fab-small{
+  width:48px; height:48px; border-radius:50%;
+  background:var(--bg-elevated); border:1px solid var(--rule);
+  display:flex; align-items:center; justify-content:center;
+  font-size:19px; color:var(--ink-dim);
+}
+.fab-mic{
+  width:62px; height:62px; border-radius:50%;
+  background:var(--amber); border:none;
+  display:flex; align-items:center; justify-content:center;
+  font-size:24px; color:#1A1305;
+  box-shadow:0 6px 20px rgba(232,163,61,.35);
+  transition:transform .15s ease;
+}
+.fab-mic.listening{
+  background:var(--danger);
+  animation:pulse 1.2s ease-in-out infinite;
+  box-shadow:0 6px 24px rgba(199,92,74,.45);
+}
+@keyframes pulse{
+  0%,100%{ transform:scale(1); }
+  50%{ transform:scale(1.07); }
+}
+
+/* ---------- SHEET (modal) ---------- */
+.sheet-backdrop{
+  position:fixed; inset:0; background:rgba(0,0,0,.55);
+  display:flex; align-items:flex-end; justify-content:center;
+  z-index:50; opacity:0; pointer-events:none;
+  transition:opacity .25s ease;
+}
+.sheet-backdrop.open{ opacity:1; pointer-events:auto; }
+.sheet{
+  width:100%; max-width:560px;
+  background:var(--bg-elevated);
+  border-radius:24px 24px 0 0;
+  border:1px solid var(--rule);
+  border-bottom:none;
+  padding:18px 20px calc(20px + var(--safe-bottom));
+  transform:translateY(100%);
+  transition:transform .3s cubic-bezier(.2,.9,.3,1);
+  max-height:88vh; overflow-y:auto;
+}
+.sheet-backdrop.open .sheet{ transform:translateY(0); }
+.sheet-handle{ width:36px; height:4px; background:var(--rule); border-radius:3px; margin:0 auto 16px; }
+.sheet-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+.sheet-title{ font-family:var(--font-display); font-size:20px; font-weight:700; }
+.sheet-close{
+  width:30px; height:30px; border-radius:50%; background:var(--bg-card);
+  border:1px solid var(--rule); color:var(--ink-dim);
+  display:flex; align-items:center; justify-content:center; font-size:14px;
+}
+
+.field-label{
+  font-family:var(--font-mono); font-size:11px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink-faint); margin:14px 0 6px;
+}
+.field-input{
+  width:100%; background:var(--bg-card); border:1px solid var(--rule);
+  border-radius:12px; padding:13px 14px; color:var(--ink);
+  font-family:var(--font-body); font-size:16px;
+}
+.field-input.amount{
+  font-family:var(--font-mono); font-size:24px; font-weight:600;
+}
+.field-input:focus{ outline:none; border-color:var(--amber-dim); }
+
+.type-toggle{ display:flex; gap:8px; margin:14px 0 4px; }
+.type-btn{
+  flex:1; padding:10px; border-radius:12px; text-align:center;
+  font-size:14px; font-weight:600; border:1px solid var(--rule);
+  background:var(--bg-card); color:var(--ink-faint);
+}
+.type-btn.active.expense{ background:rgba(199,92,74,.15); border-color:var(--danger); color:#E89485; }
+.type-btn.active.income{ background:rgba(127,166,107,.15); border-color:var(--good); color:#9FC78A; }
+
+.cat-scroll{ display:flex; gap:8px; overflow-x:auto; padding:2px 0 4px; scrollbar-width:none; }
+.cat-scroll::-webkit-scrollbar{display:none;}
+.cat-chip{
+  flex-shrink:0; display:flex; align-items:center; gap:6px;
+  padding:9px 13px; border-radius:100px; border:1px solid var(--rule);
+  background:var(--bg-card); font-size:13px; color:var(--ink-dim); white-space:nowrap;
+}
+.cat-chip.selected{ border-color:var(--amber); background:rgba(232,163,61,.12); color:var(--amber); }
+.cat-chip.add-new{ color:var(--ink-faint); border-style:dashed; }
+
+.list-scroll{ display:flex; gap:8px; overflow-x:auto; padding:2px 0 4px; scrollbar-width:none;}
+.list-scroll::-webkit-scrollbar{display:none;}
+.list-chip{
+  flex-shrink:0; display:flex; align-items:center; gap:6px;
+  padding:9px 13px; border-radius:100px; border:1px solid var(--rule);
+  background:var(--bg-card); font-size:13px; color:var(--ink-dim); white-space:nowrap;
+}
+.list-chip.selected{ border-color:var(--amber); color:var(--amber); }
+
+.recur-row{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-top:16px; padding:12px 14px;
+  background:var(--bg-card); border:1px solid var(--rule); border-radius:12px;
+}
+.recur-row .lbl{ font-size:14px; color:var(--ink-dim); display:flex; align-items:center; gap:8px;}
+.recur-select{
+  background:transparent; border:1px solid var(--rule); border-radius:8px;
+  color:var(--amber); font-family:var(--font-mono); font-size:12px; padding:5px 8px;
+}
+.toggle{
+  width:42px; height:25px; border-radius:100px; background:var(--rule);
+  position:relative; flex-shrink:0; transition:background .2s;
+}
+.toggle.on{ background:var(--amber); }
+.toggle::after{
+  content:''; position:absolute; top:3px; left:3px; width:19px; height:19px;
+  border-radius:50%; background:var(--bg); transition:transform .2s;
+}
+.toggle.on::after{ transform:translateX(17px); }
+
+.save-btn{
+  width:100%; padding:16px; border-radius:14px; border:none;
+  background:var(--amber); color:#1A1305; font-weight:700; font-size:16px;
+  margin-top:20px; font-family:var(--font-body);
+}
+.save-btn:disabled{ background:var(--rule); color:var(--ink-faint); }
+
+.delete-btn{
+  width:100%; padding:14px; border-radius:14px; border:1px solid var(--danger);
+  background:transparent; color:var(--danger); font-weight:600; font-size:14px;
+  margin-top:10px;
+}
+
+/* voice listening state inside sheet */
+.voice-stage{
+  display:flex; flex-direction:column; align-items:center; gap:18px;
+  padding:30px 10px 10px;
+}
+.voice-orb{
+  width:96px; height:96px; border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, #F2C879, var(--amber));
+  display:flex; align-items:center; justify-content:center; font-size:34px;
+  box-shadow:0 0 0 0 rgba(232,163,61,.5);
+  animation:orb-pulse 1.4s ease-in-out infinite;
+}
+@keyframes orb-pulse{
+  0%{ box-shadow:0 0 0 0 rgba(232,163,61,.45); }
+  70%{ box-shadow:0 0 0 22px rgba(232,163,61,0); }
+  100%{ box-shadow:0 0 0 0 rgba(232,163,61,0); }
+}
+.voice-transcript{
+  font-family:var(--font-display); font-size:22px; text-align:center;
+  color:var(--ink); min-height:60px; line-height:1.3; padding:0 10px;
+}
+.voice-hint{ font-size:13px; color:var(--ink-faint); text-align:center; }
+.voice-parsed{
+  width:100%; background:var(--bg-card); border:1px solid var(--rule);
+  border-radius:14px; padding:16px; margin-top:6px;
+}
+.voice-parsed-row{ display:flex; justify-content:space-between; align-items:center; padding:6px 0; }
+.voice-parsed-row .k{ font-size:12px; color:var(--ink-faint); font-family:var(--font-mono); }
+.voice-parsed-row .v{ font-size:15px; color:var(--ink); font-weight:600; }
+
+/* list manager */
+.manage-row{
+  display:flex; align-items:center; gap:12px; padding:13px 0;
+  border-bottom:1px solid var(--rule-soft);
+}
+.manage-row .emoji{ font-size:20px; width:30px; text-align:center;}
+.manage-row .name{ flex:1; font-size:15px; }
+.manage-row .check{ color:var(--amber); font-size:16px; }
+.manage-row .del{ color:var(--ink-faint); font-size:13px; }
+.add-list-row{
+  display:flex; gap:8px; margin-top:14px;
+}
+.add-list-row input{ flex:1; }
+.add-list-row button{
+  background:var(--amber); color:#1A1305; border:none; border-radius:10px;
+  padding:0 18px; font-weight:700;
+}
+
+/* toast */
+#toast{
+  position:fixed; left:50%; bottom:140px; transform:translateX(-50%) translateY(20px);
+  background:var(--bg-card); border:1px solid var(--rule); color:var(--ink);
+  padding:10px 18px; border-radius:100px; font-size:13px;
+  opacity:0; pointer-events:none; transition:all .25s ease;
+  z-index:100; white-space:nowrap;
+}
+#toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* settings gear top */
+.period-row{ display:flex; gap:8px; margin-top:8px; }
+.period-pill{
+  font-family:var(--font-mono); font-size:11px; color:var(--ink-dim);
+  background:var(--bg-elevated); border:1px solid var(--rule); border-radius:100px;
+  padding:5px 11px;
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <div class="topbar">
+    <button class="list-switcher" id="listSwitcherBtn">
+      <span class="dot"></span>
+      <span id="currentListName">Personal</span>
+      <span class="chev">▾</span>
+    </button>
+    <button class="icon-btn" id="settingsBtn">⚙︎</button>
+  </div>
+
+  <div class="hero">
+    <div class="hero-eyebrow">
+      <span class="period-pick" id="periodLabel">Este mes</span>
+      <span>·</span>
+      <span id="periodDates">—</span>
+    </div>
+    <div class="hero-total">
+      <span id="heroTotal">0</span><span class="sign">$</span>
+    </div>
+  </div>
+
+  <div class="bars-row" id="barsRow"></div>
+
+  <div class="ledger" id="ledger"></div>
+
+</div>
+
+<div class="fab-row">
+  <div class="fab-left">
+    <button class="fab-small" id="addBtn">＋</button>
+    <button class="fab-small" id="searchBtn">⌕</button>
+  </div>
+  <button class="fab-mic" id="micBtn">🎙</button>
+</div>
+
+<!-- ENTRY SHEET (manual + voice) -->
+<div class="sheet-backdrop" id="entrySheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title" id="entrySheetTitle">Nuevo movimiento</div>
+      <button class="sheet-close" id="entryCloseBtn">✕</button>
+    </div>
+
+    <!-- voice stage (shown only during listening/processing) -->
+    <div class="voice-stage" id="voiceStage" style="display:none;">
+      <div class="voice-orb">🎙</div>
+      <div class="voice-transcript" id="voiceTranscript">Escuchando…</div>
+      <div class="voice-hint" id="voiceHint">di algo como "tacos afuera por 230"</div>
+    </div>
+
+    <div id="manualForm">
+      <div class="type-toggle">
+        <div class="type-btn active expense" id="typeExpenseBtn">Gasto</div>
+        <div class="type-btn income" id="typeIncomeBtn">Ingreso</div>
+      </div>
+
+      <div class="field-label">Descripción</div>
+      <input class="field-input" id="descInput" placeholder="¿En qué fue?" maxlength="60">
+
+      <div class="field-label">Monto</div>
+      <input class="field-input amount" id="amountInput" placeholder="0.00" inputmode="decimal">
+
+      <div class="field-label">Categoría</div>
+      <div class="cat-scroll" id="catScroll"></div>
+
+      <div class="field-label">Lista</div>
+      <div class="list-scroll" id="entryListScroll"></div>
+
+      <div class="recur-row">
+        <div class="lbl">🔁 Recurrente</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <select class="recur-select" id="recurFreq" disabled>
+            <option value="monthly">Mensual</option>
+            <option value="weekly">Semanal</option>
+            <option value="yearly">Anual</option>
+          </select>
+          <div class="toggle" id="recurToggle"></div>
+        </div>
+      </div>
+
+      <button class="save-btn" id="saveBtn">Guardar</button>
+      <button class="delete-btn" id="deleteTxBtn" style="display:none;">Eliminar movimiento</button>
+    </div>
+  </div>
+</div>
+
+<!-- LIST MANAGER SHEET -->
+<div class="sheet-backdrop" id="listSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">Tus listas</div>
+      <button class="sheet-close" id="listCloseBtn">✕</button>
+    </div>
+    <div id="listManageRows"></div>
+    <div class="add-list-row">
+      <input class="field-input" id="newListInput" placeholder="Nombre de nueva lista" maxlength="24">
+      <button id="addListBtn">＋</button>
+    </div>
+  </div>
+</div>
+
+<!-- SEARCH SHEET -->
+<div class="sheet-backdrop" id="searchSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">Buscar</div>
+      <button class="sheet-close" id="searchCloseBtn">✕</button>
+    </div>
+    <input class="field-input" id="searchInput" placeholder="Descripción, categoría, monto…">
+    <div id="searchResults" style="margin-top:14px;"></div>
+  </div>
+</div>
+
+<!-- SETTINGS SHEET -->
+<div class="sheet-backdrop" id="settingsSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">Ajustes</div>
+      <button class="sheet-close" id="settingsCloseBtn">✕</button>
+    </div>
+    <div class="field-label">Periodo del dashboard</div>
+    <div class="cat-scroll" id="periodScroll">
+      <div class="cat-chip" data-period="week">Esta semana</div>
+      <div class="cat-chip selected" data-period="month">Este mes</div>
+      <div class="cat-chip" data-period="year">Este año</div>
+      <div class="cat-chip" data-period="all">Todo</div>
+    </div>
+
+    <div class="field-label" style="margin-top:22px;">Datos</div>
+    <button class="save-btn" id="exportBtn" style="background:var(--bg-card); color:var(--ink); border:1px solid var(--rule);">Exportar respaldo (.json)</button>
+    <button class="delete-btn" id="wipeBtn" style="margin-top:10px;">Borrar todos los datos</button>
+
+    <div class="field-label" style="margin-top:22px;">Acerca de</div>
+    <div style="font-size:13px; color:var(--ink-faint); line-height:1.6;">
+      Recibo guarda todo en este dispositivo. No hay cuentas, no hay nube, no hay costo mensual.
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
